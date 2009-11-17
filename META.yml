@@ -1,0 +1,19 @@
+--- #YAML:1.0
+name:                App-xml_grep2
+version:             0.09
+abstract:            use XPath to grep XML files
+license:             perl
+author:              
+    - mirod <mirod@cpan.org>
+generated_by:        ExtUtils::MakeMaker version 6.42
+distribution_type:   module
+requires:     
+    File::Find::Rule:              0
+    Getopt::Long:                  0
+    Pod::Usage:                    0
+    Test::More:                    0
+    XML::LibXML:                   0
+    XML::LibXML::XPathContext:     0
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3
