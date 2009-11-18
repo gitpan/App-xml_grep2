@@ -143,7 +143,7 @@ is(  `$XML_GREP2 -q -v $foo $DATA`, '', '-q -v regular hit');
 is(  system( "$XML_GREP2 -q -v $foo $DATA"), 0, '-q -v regular hit (exit code)');
 
 like( `$XML_GREP2 $RECURSE -c $xdoc $TEST_DIR 2>&1`, 
-    qr{(t/test.xml:1\nxml_grep2: t/malformed.xml:2: parser error : Premature end of data in tag doc line 1\n|xml_grep2: t/malformed.xml:2: parser error : Premature end of data in tag doc line 1\nt/test.xml:1\n)},
+    qr{xml_grep2: t/malformed.xml:2: parser error : Premature end of data in tag doc line 1\n},
     'malformed XML'
   );
 is( `$XML_GREP2 $RECURSE -c -s $xdoc $TEST_DIR 2>&1`, "t/test.xml:1\n", 'malformed XML (-s)');
@@ -153,7 +153,7 @@ is(  system( "$XML_GREP2 $RECURSE -q $xdoc $TEST_DIR 2>&1"), 0, '-q with malform
 is( `$XML_GREP2 $RECURSE -q $foo $TEST_DIR 2>&1`, '', '-q with malformed XML, no hit');
 ok(  system( "$XML_GREP2 $RECURSE -q $foo $TEST_DIR 2>&1"), '-q with malformed XML, no hit (exit code)');
 
-like( `$XML_GREP2 -v $foo $MALFORMED 2>&1`, qr{^\s*xml_grep2: t/malformed.xml:2: parser error : Premature end of data in tag doc line 1\s*$}, '-v on malformed data');
+like( `$XML_GREP2 -v $foo $MALFORMED 2>&1`, qr{xml_grep2: t/malformed.xml:2: parser error : Premature end of data in tag doc line 1}, '-v on malformed data');
 is( `$XML_GREP2 -v -s $foo $MALFORMED 2>&1`, '', '-v -s on malformed data');
 
 is( `$CAT $DATA | $XML_GREP2 -v $xdoc`, '', '-v on entire doc');
