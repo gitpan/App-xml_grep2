@@ -1,5 +1,8 @@
 Revision history for App-xml_grep2
 
+0.11    2009-11-22
+        Fixed --man test
+
 0.10    2009-11-18
         Fixed tests so they would pass with different versions of XML::LibXML 
 

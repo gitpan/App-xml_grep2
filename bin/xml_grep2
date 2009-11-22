@@ -10,7 +10,7 @@ use XML::LibXML qw( :all) ;
 
 binmode STDIN;
 
-our $VERSION="0.10";
+our $VERSION="0.11";
 
 my $ns           = "xg2";
 my $ns_uri       = "http://xmltwig.com/tools/xml_grep2/";

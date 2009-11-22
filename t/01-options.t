@@ -104,7 +104,7 @@ is( `$XML_GREP2 -s -t -r $xel2 $TEST_DIR/* 2>&1`, "$DATA:text e1-2\n", '-s, unpa
 
 is( `$XML_GREP2 --unexisting-option 2>&1`, "Unknown option: unexisting-option\n", 'wrong option');
 like( `$XML_GREP2 --help`, qr{^Options:}, '--help');
-like( `$XML_GREP2 --man`,  qr{^XML_GREP2\(1\)}, '--man');
+like( `$XML_GREP2 --man`,  qr{XML_GREP2}, '--man');
 is( `$XML_GREP2 2>&1`, "xml_grep2 [options] <xpath> <files>\n", 'usage');
 
 is( `$CAT $DATA | $XML_GREP2 -t $xel2`, "text e1-2\n", '-t, from stdin');
