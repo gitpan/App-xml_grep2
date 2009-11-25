@@ -5,358 +5,77 @@ use warnings;
 
 use Pod::Usage;
 use Getopt::Long;
-use File::Find::Rule;
-use XML::LibXML qw( :all) ;
 
-binmode STDIN;
+use App::Xml_grep2;
 
-our $VERSION="0.11";
 
-my $ns           = "xg2";
-my $ns_uri       = "http://xmltwig.com/tools/xml_grep2/";
-my $result_tag   = "result_set";
-my $file_tag     = "file";
-my $att_filename = "filename";
+our $VERSION="0.12";
 
-my $indent= ' ' x2;
+my $option={};
 
-my( # options (all used globally in the script)
-    $catalog, $count, $help, $format, $gen_if_empty, $wrap, $no_wrap, $html, $files_no, $files, $label, 
-    $man, $max_count, $original_encoding, $quiet, $recursive, $include_pattern, $exclude_pattern, 
-    $no_warnings, $text_only, $reverse, $version, $no_xml_wrap, $xml_wrap, $ns_defs,
-  );
-	
-Getopt::Long::Configure( qw(bundling));
+my $defaults= { 
+                format            => 0,
+                original_encoding => 0,
+                ns           => "xg2", # can be overwritten through the ns option
+                ns_uri       => "http://xmltwig.com/tools/xml_grep2/",
+                result_tag   => "result_set",
+                file_tag     => "file",
+                att_filename => "filename",
+                indent       => ' ' x2,
+              };
+
+
+Getopt::Long::Configure( qw(gnu_getopt));
 
 my $USAGE= "xml_grep2 [options] <xpath> <files>\n";
 
-GetOptions( 
-            'c|count'                 => \$count,          # done
-            'C|catalog=s'             => \$catalog,        # done
-            'help'                    => \$help,           # done
-            'f|format=i'              => \$format,         # done
-            'g|generate-empty-set'    => \$gen_if_empty,   # done
-            'H|wrap|with-filename'    => \$wrap,           # done force file wrapping
-            'h|nowrap|no-filename'    => \$no_wrap,        # done force no file wrapping
-            'html'                    => \$html,           # done
-            'L|files-without-matches' => \$files_no,       # done list files with no match
-            'l|files-with-matches'    => \$files,          # done
-            'label=s'                 => \$label,          # done
-            'M|man'                   => \$man,            # done
-            'm|max-count=i'           => \$max_count,      # done
-            'n|namespace=s'           => \$ns,             # done
-            'N|define-ns=s%'          => \$ns_defs,        # done
-            'o|original-encoding'     => \$original_encoding, # done
-            'q|quiet|silent'          => \$quiet,           # done
-            'r|R|recursive'           => \$recursive,       # done
-            'include=s'               => \$include_pattern, # done
-            'exclude=s'               => \$exclude_pattern, # done
-            's|no-messages'           => \$no_warnings,     # done
-            't|text_only'             => \$text_only,       # done
-            'v|invert-match'          => \$reverse,         # done
-            'V|version'               => \$version,         # done
-            'x|no-xml-wrap'           => \$no_xml_wrap,     # done
-            'X|xml-wrap'              => \$xml_wrap,        # done
+# options go into $option->{<first_given_option>}
+# so put the hash field first (better if it's a valid Perl name) 
+GetOptions( $option,
+            'count|c',
+            'catalog|C=s',
+            'help',
+            'format|f=i',
+            'generate_empty_set|generate-empty-set|g',
+            'wrap|with_filename|with-filename|H',
+            'nowrap|no_filename|no-filename|h',
+            'html',
+            'files_without_matches|files-without-matches|L',
+            'files_with_matches|files-with-matches|l',
+            'label=s',
+            'man|M',
+            'max_count|max-count|m=i',
+            'ns|namespace|n=s',
+            'define_ns|define-ns|N=s%',
+            'original_encoding|original-encoding|o',
+            'quiet|silent|q',
+            'recursive|R|r',
+            'include=s',
+            'exclude=s',
+            'no_messages|no-messages|s',
+            'text_only|text-only|t',
+            'invert_match|invert-match|v',
+            'version|V',
+            'no_xml_wrap|no-xml-wrap|x',
+            'xml_wrap|xml-wrap|X',
+            'xl|XL|liberal',
           ) or pod2usage(2);
 
-pod2usage(1) if $help;
-pod2usage(-exitstatus => 0, -verbose => 2) if $man;
-if( $version) { warn "$0 version $VERSION\n"; exit; }
+pod2usage(1) if $option->{help};
+pod2usage(-exitstatus => 0, -verbose => 2) if $option->{man};
+if( $option->{version}) { warn "$0 version $VERSION\n"; exit; }
 
-check_options(); # dies in case of error
+my $grepper= App::Xml_grep2->new( $defaults, $option);
 
-$format ||=0;
-$original_encoding ||=0;
-my $ns_column = $ns ? "$ns:" : "";
-
-if( !$original_encoding) { binmode STDOUT, ':encoding(utf-8)'; } 
-
-my %parser_option;
-if( $catalog) { $parser_option{catalog}= $catalog; }
-my $parser= XML::LibXML->new( %parser_option);
-
-# first arg is a path
 my $xpath= shift @ARGV or die $USAGE; 
-
-# get file list
-my @files;
-if( @ARGV)
-  { @files= $recursive ? file_list( @ARGV) : @ARGV; }  
-else
-  { push @files, undef; }
-
-my $more_than_one_file = scalar @files > 1;
-my $xml_result         = ! ($text_only || $files || $files_no || $count);
-my $split_result       = $wrap || ($more_than_one_file && !$no_wrap);
-my $need_file_wrapper  = $xml_result && $split_result;
-my $need_wrapper       = $xml_result && !$no_xml_wrap;
-my $need_filename      = ($text_only || $count) && $split_result;
-
-
-my $header= $need_wrapper ? header() : '';
-my $footer= $need_wrapper ? footer() : '';
-
-my $ns_mapping= keys %$ns_defs;
-
-if( $XML::LibXML::VERSION < 1.61 && $ns_mapping) 
-  { if( eval { require XML::LibXML::XPathContext })
-       { import XML::LibXML::XPathContext; }
-     else
-       { die "XML::LibXML::XPathContext not found, needed to use -N, --define-ns option"; }
-  }
-
-my $got_result;
-    
-foreach my $file (@files)
-  { if( $quiet)
-      { if( $reverse)
-          { my $doc= grep_v( $xpath, $file); 
-            if( $doc && doc_has_root( $doc)) { exit 0; }
-          }
-        else
-          { my $nb= grep_nb( $xpath, $file);
-            if( $nb) { exit 0; }
-          }
-      }
-    elsif( $files)
-      { my $nb= grep_nb( $xpath, $file);
-        if( $nb) 
-          { 
-            print_filename( $file);
-          }
-      }
-    elsif( $files_no)
-      { my $nb= grep_nb( $xpath, $file);
-        if( !$nb) 
-          { 
-            print_filename( $file);
-          }
-      }
-    elsif( $reverse)
-      { my $doc= grep_v( $xpath, $file);
-        if( $doc)
-          { if( doc_has_root( $doc) )
-              { if( $header) { print $header; $header= ''; }
-                if( $xml_wrap)
-                  { # remove the XML declaration from the subdoc
-                    (my $out= $doc->toString( $format, $original_encoding))=~s{^\s*<\?xml[^>]*>\n?}{};
-                    print $out; 
-                  }
-                else
-                  { print $doc->toString( $format, $original_encoding), "\n"; }
-                $got_result=1;
-              }
-          }
-      }
-    elsif( $text_only)
-      { my $set= grep_text( $xpath, $file) or next;;
-        if( @$set)
-          { 
-            if( $need_filename) { foreach (@$set) { s{^}{$file:} } } # add filename
-            print @$set;
-          }
-      }
-    elsif( $count)
-      { my $nb= grep_nb( $xpath, $file);
-        if( !defined $nb) { next; }
-        print $need_filename ? "$file:$nb\n" : "$nb\n"; 
-      }
-    else
-      { # regular mode
-        my $nodes= grep_nodes( $xpath, $file) or next;
-        if( @$nodes)
-          { if( $header) 
-              { if( $original_encoding) 
-                  { my $encoding= $nodes->[0]->ownerDocument->encoding;
-                    if( $encoding) { $header=~ s{UTF-8}{$encoding}; }
-                  }
-                print $header; 
-                $header= '';
-              }
-            if( $need_file_wrapper)
-              { print file_header( $file),
-                      map( { $format ? indented_xml( $_->toString( $format, $original_encoding), 2) . "\n"
-                                     : $_->toString( $format, $original_encoding) . "\n"
-                           } @$nodes
-                          ),
-                      file_footer(),
-                      ;
-              }
-            else
-              { print map( { $format ? indented_xml( $_->toString( $format, $original_encoding), 1) . "\n" 
-                                     : $_->toString( $format, $original_encoding) . "\n"
-                           } @$nodes
-                         ),
-                      ;
-              }
-            $got_result=1;
-          }
-      }         
-  }
-
-if( $quiet) { exit -1; }
-
-if( $header && $gen_if_empty)                  { print $header; } # in case no result was found
-if( $footer && ($got_result || $gen_if_empty)) { print $footer; }
-
-exit 0;
-  
-sub file_list
-  { my $rules= File::Find::Rule->new;
-    if( $include_pattern) { $rules->name( $include_pattern);     }
-    if( $exclude_pattern) { $rules->not_name( $exclude_pattern); }
-    unless( $recursive)   { $rules->maxdepth( 0);                }
-    $rules->not_directory();
-    my @files= $rules->in( @_);
-    return @files;
-  }
-
-
-sub grep_nodes
-  { my( $xpath, $file)= @_;
-    my( undef, @nodes)= findnodes( $file => $xpath) or return ;
-    if( $max_count && (@nodes >= $max_count)) { $#nodes= $max_count -1; }
-    return \@nodes;
-  }
-
-sub grep_v
-  { my( $xpath, $file)= @_;
-    my( $doc, @nodes)= findnodes( $file => $xpath) or return ;
-    foreach my $node (@nodes)
-      { my $parent= $node->parentNode or return;
-        $parent->removeChild( $node);
-      }
-    return $doc;
-  }
-
-
-sub findnodes
-  { my( $file, $xpath)= @_;
-
-    my $doc;
-
-    if( defined $file)
-      { # need to test this instead of calling parse_*_file, or we get an untrappable "I/O error : Permission denied" 
-        # message from XML::LibXML
-        if( ! -e $file) 
-          { mwarn( "xml_grep2: $file: No such file or directory"); 
-            return;
-          } 
-        elsif( ! -r $file) 
-          { mwarn( "xml_grep2: $file: Permission denied"); 
-            return;
-          } 
-        $doc= $html ? eval { $parser->parse_html_file( $file); } : eval { $parser->parse_file( $file); }; }
-    else
-      { 
-        $doc= $html ? eval { $parser->parse_html_fh( \*STDIN); } : eval { $parser->parse_fh( \*STDIN); };
-      }
-
-    if( $@) 
-      { if( !$no_warnings) 
-          { parsing_exception( $@); }
-        return;
-      }
-
-    if( $ns_mapping)
-      { my $xc= XML::LibXML::XPathContext->new( $doc);
-        while( my( $prefix, $uri)= each %$ns_defs) { $xc->registerNs( $prefix => $uri) }
-        return $xc, $xc->findnodes( $xpath);
-      }
-    else
-      { return $doc, $doc->findnodes( $xpath); }
-  }
-
-
-sub grep_text
-  { my $nodes= grep_nodes( @_) or return;
-    my @text= map { $_->textContent } @$nodes;
-    foreach (@text) { s{[\n\r]\s*}{ }g; $_ .= "\n"} # trim linefeeds
-    return \@text;
-  }
-
-sub grep_nb
-  { my $nodes= grep_nodes( @_) or return;
-    return scalar @$nodes;
-  }
-
-
-
-sub parsing_exception
-  { my( $warning)= @_;
-
-    if( $warning=~ m{^I/O error}) { return; }
-
-    if( $warning=~ m{^Could not create file parser context for file "(.*?)": (.*?)( at .* line \d+)?\s*$})
-      { $warning= "$1: $2"; }
-    mwarn( "xml_grep2: $warning"); 
-    return;
-  }
-
-sub doc_has_root
-  { my( $doc)= @_;
-    return scalar grep { $_->nodeType == XML_ELEMENT_NODE } $doc->childNodes()
-  }
-
-sub mwarn
-  { if( ! $no_warnings) 
-      { my $warning= join '', @_;
-        $warning=~ s{\s*$}{\n};
-         warn $warning; 
-       } 
-  }
-
-sub print_filename
-  { my( $file)= @_;
-    if( ! defined $file) { $file = $label ? $label : "(stdin)"; }
-    print "$file\n";
-  }
-
-sub header
-  { my $xmlns= $ns ? qq{ xmlns:$ns="$ns_uri"} : '';
-    return qq{<?xml version="1.0" encoding="UTF-8"?>\n<$ns_column$result_tag$xmlns>\n}; 
-  }
-sub footer  
-  { return qq{</$ns_column$result_tag>\n}; }
-sub file_header
-  { my $file= xml_escape( shift()); return qq{  <$ns_column$file_tag $ns_column$att_filename="$file">\n}; }
-sub file_footer
-  { return qq{  </$ns_column$file_tag>\n}; }
-
-sub indented_xml
-  { my( $string, $level)= @_;
-    my $prefix= $indent x $level;
-    $string=~ s{^}{$prefix}gm;
-    return $string;
-  }
-
-sub xml_escape
-  { my $string= shift();
-    $string=~ s{&}{&amp;}g;
-    $string=~ s{<}{&lt;}g;
-    $string=~ s{>}{&gt;}g;
-    $string=~ s{"}{&quote;}g;
-    return $string;
-  }
-
-sub check_options
-  { # things that do not work with -v
-      if( $reverse)
-        { if( $count)      { die "cannot use -v, --invert-match and -c, --count\n";     }
-          if( $text_only)  { die "cannot use -v, --invert-match and -t, --text-only\n"; }
-          if( $max_count)  { die "cannot use -v, --invert-match and -m, --max-count\n"; }
-          if( !$xml_wrap)  { $no_xml_wrap=1; }
-        }
-
-    # one option implies an other one
-    if( $quiet) { $no_warnings=1; }
-
-  }
-
+my $status= $grepper->grep( $xpath, @ARGV);
+ 
+exit $status;
+ 
 __END__
 =head1 NAME
 
-  xml_grep2 - grep XML files looking for specific elements
+  xml_grep2 - grep XML files using XPath
 
 =head1 SYNOPSYS
 
@@ -550,7 +269,15 @@ C<-X> or X<--xml-wrap> to force the XML wrapping in this case)
 
 Forces the use of the XML wrapper around the output, when C<-v> is used. 
 
+=item B<xl>, B<liberal>
+
+Use XML::Liberal to parse broken XML. XML::Liberal needs to be installed
+for this option to be available
+
 =back
+
+All options names that use '-' can also use '_' instead, eg you can use
+C<no-xml-wrap> or C<no_xml_wrap>.
 
 =head1 Differences with grep
 
@@ -626,7 +353,7 @@ to be quoted because the C<|> is special for the shell.
 Get the content (B<-t>) of all C<RowAmount> elements in C<.xml> files in the 
 C<invoices> directory (and sub-directories)
 
-The result will be a text stream with 1 result perl line. The B<-h> option
+The result will be a text stream with 1 result per line. The B<-h> option
 suppresses the display of the file name at the beginning of each line.
 
 =item xml_grep2 -t -r -h --include '*.xml' '//@AmountCurrencyIdentifier' /invoices/
@@ -635,11 +362,11 @@ Get the value of all C<AmountCurrencyIdentifier> attribute in C<.xml> files
 in the C<invoices> directory (and sub-directories). Piping this to C<sort -u>
 will give you all the currencies used in the invoices.
 
-=item xml_grep2 -v '/p[@class="classified"]' secret.xml > pr.xml
+=item xml_grep2 -v '//p[@class="classified"]' secret.xml > pr.xml
 
 Remove all C<p> elements in the C<classified> class from the file C<secret.xml>
 
-=item xml_grep2 -t -N d='http://purl.org/rss/1.0/' '//d:title' use.perl.org.rss.xml
+=item xml_grep2 -t -N d='http://perl.org/rss/1.0/' '//d:title' use.perl.org.rss.xml
 
 Extract the text of the titles from the RSS feed for use.perl.org
 
