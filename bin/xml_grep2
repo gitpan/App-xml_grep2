@@ -9,7 +9,7 @@ use Getopt::Long;
 use App::Xml_grep2;
 
 
-our $VERSION="0.12";
+our $VERSION="0.13";
 
 my $option={};
 

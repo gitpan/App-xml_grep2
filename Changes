@@ -1,5 +1,8 @@
 Revision history for App-xml_grep2
 
+0.13    2009-11-26
+        added lib/App/Xml_grep2 to MANIFEST. Duh!
+
 0.12    2009-11-25
         Added the xl option, which uses XML::Liberal to parse even broken XML
         refactored to make xml_grep2 a very simple front end to the 

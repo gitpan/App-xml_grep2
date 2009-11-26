@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                App-xml_grep2
-version:             0.12
+version:             0.13
 abstract:            use XPath to grep XML files
 license:             perl
 author:              

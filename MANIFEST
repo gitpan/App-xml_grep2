@@ -3,6 +3,7 @@ MANIFEST
 Makefile.PL
 README
 bin/xml_grep2
+lib/App/Xml_grep2.pm
 t/01-options.t
 t/test.xml
 t/test.html
