@@ -9,7 +9,7 @@
     <e1 id="e1-5" att1="val4">text e1-5</e1>
     <e1 id="e1-6" att1="val5">text e1-6</e1>
   </s1>
-  <s1 id="s1-2" att1="val4" xmlns:xg="http://xmltwig.com/xg">
+  <s1 id="s1-2" att1="val4" xmlns:xg="http://xmltwig.org/xg">
     <xg:e1 id="e1-7" att1="val2">text e1-7</xg:e1>
   </s1>
 </doc>

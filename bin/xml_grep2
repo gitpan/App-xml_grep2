@@ -3,13 +3,14 @@
 use strict;
 use warnings;
 
-use Pod::Usage;
+#use Pod::Usage;
+use Pod::Text;
 use Getopt::Long;
 
 use App::Xml_grep2;
 
 
-our $VERSION="0.13";
+our $VERSION="0.14";
 
 my $option={};
 
@@ -17,7 +18,7 @@ my $defaults= {
                 format            => 0,
                 original_encoding => 0,
                 ns           => "xg2", # can be overwritten through the ns option
-                ns_uri       => "http://xmltwig.com/tools/xml_grep2/",
+                ns_uri       => "http://xmltwig.org/tools/xml_grep2/",
                 result_tag   => "result_set",
                 file_tag     => "file",
                 att_filename => "filename",
@@ -59,10 +60,10 @@ GetOptions( $option,
             'no_xml_wrap|no-xml-wrap|x',
             'xml_wrap|xml-wrap|X',
             'xl|XL|liberal',
-          ) or pod2usage(2);
+          ) or exit( 2);
 
-pod2usage(1) if $option->{help};
-pod2usage(-exitstatus => 0, -verbose => 2) if $option->{man};
+output_pod(-exitstatus => 0, -verbose => 1) if $option->{help};
+output_pod(-exitstatus => 0, -verbose => 2) if $option->{man};
 if( $option->{version}) { warn "$0 version $VERSION\n"; exit; }
 
 my $grepper= App::Xml_grep2->new( $defaults, $option);
@@ -71,6 +72,22 @@ my $xpath= shift @ARGV or die $USAGE;
 my $status= $grepper->grep( $xpath, @ARGV);
  
 exit $status;
+
+
+sub output_pod
+  { my %option= @_;
+    
+    my $pod= do { local undef $/; <DATA> };
+    if( $option{-verbose} == 1)
+      { $pod= join "\n", map { $pod=~ m{(=head1 $_.*?)=head1}s } qw( NAME SYNOPSYS OPTIONS); }
+    
+    my $parser= Pod::Text->new();
+    $parser->output_fh( *STDOUT);
+    $parser->parse_string_document( $pod);
+
+    my $status= $option{-exitstatus} || 0;
+    exit $status;
+  }
  
 __END__
 =head1 NAME
@@ -196,7 +213,7 @@ Change the default namespace prefix used for wrapping results. The default is C<
 Use an empty string C<-n ''> to remove the namespace altogether.
 
 If a namespace (default or otherwise) is used, it is associated to the URI 
-C<http://xmltwig.com/tools/xml_grep2/>
+C<http://xmltwig.org/tools/xml_grep2/>
 
 =item B<-o>, B<--original-encoding> 
 
@@ -287,7 +304,7 @@ There are some differences in behaviour with grep that are worth being mentioned
 
 =item files are always parsed and loaded in memory
 
-This is inevitable due to the radom-access nature of XPath
+This is inevitable due to the random-access nature of XPath
 
 =item the file list is built before the grepping start
 
@@ -373,7 +390,7 @@ Extract the text of the titles from the RSS feed for use.perl.org
 As the title elements are in the default namespace, the only way to get them is to
 define a mapping between a prefix and the namespace URI, then to use it. 
 
-=item GET http://xmltwig.com/index.html | ./xml_grep2 --html -t '//@href' | sort -u
+=item GET http://xmltwig.org/index.html | ./xml_grep2 --html -t '//@href' | sort -u
 
 Get the list of links in a web page
 

@@ -13,4 +13,5 @@ t/catalog.templ
 t/with_cat.cxml
 t/with_cat.ent
 t/test_latin1.lxml
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

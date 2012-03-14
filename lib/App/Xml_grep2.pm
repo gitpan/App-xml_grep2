@@ -144,22 +144,16 @@ sub grep
                     print $header; 
                     $header= '';
                   }
+
                 if( $need_file_wrapper)
-                  { print $self->file_header( $file),
-                          map( { $self->{format} ? $self->indented_xml( $_->toString( $self->{format}, $self->{original_encoding}), 2)  . "\n"
-                                                 : $_->toString( $self->{format}, $self->{original_encoding}) . "\n"
-                               } @$nodes
-                              ),
-                          $self->file_footer(),
+                  { print $self->file_header( $file);
+                    $self->_print_hits_in_file( 2 => $nodes);
+                    print $self->file_footer(),
                           ;
                   }
                 else
-                  { print map( { $self->{format} ? $self->indented_xml( $_->toString( $self->{format}, $self->{original_encoding}), 1) . "\n" 
-                                                 : $_->toString( $self->{format}, $self->{original_encoding}) . "\n"
-                               } @$nodes
-                             ),
-                          ;
-                  }
+                  { $self->_print_hits_in_file( 1 => $nodes); }
+
                 $got_result=1;
               }
           }         
@@ -172,6 +166,15 @@ sub grep
     
     return 0;
   }
+
+# the print is done here to avoid passing a potentially pretty big string around
+sub _print_hits_in_file
+  { my( $self, $format, $nodes)= @_;
+    print map( { $self->{format} ? $self->indented_xml( $_->toString( $self->{format}, $self->{original_encoding}), $format)  . "\n"
+                                                 : $_->toString( 0, $self->{original_encoding}) . "\n"
+                               } @$nodes
+                              );
+  } 
       
 sub file_list
   { my $self= shift;

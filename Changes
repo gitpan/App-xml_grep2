@@ -1,5 +1,15 @@
 Revision history for App-xml_grep2
 
+0.14    2011-03-10
+        fixed warnings and man/help display in tests
+        fixed RT #75042, due to changes in the way XML::LibXML 
+        formats its output, reported by Thomas Reuben
+        https://rt.cpan.org/Ticket/Display.html?id=75042
+        fixed typos in help, reported by Thomas Reuben
+        changed the namespace url from xmltwig.com to xmltwig.org
+        (more accurately from http://xmltwig.org/tools/xml_grep2/
+        to http://xmltwig.org/tools/xml_grep2/)
+
 0.13    2009-11-26
         added lib/App/Xml_grep2 to MANIFEST. Duh!
 
